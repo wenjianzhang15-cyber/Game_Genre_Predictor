@@ -1,6 +1,6 @@
 # Local security controls and container verification
 
-These changes are local; the existing HF deployment has not been updated.
+These application controls were deployed to the existing HF Space on 2026-10-29 at revision `77216ec63ad9a93d782d8bc9af80f5000eced9cc`. Hosting-level Docker resource flags remain distinct from application controls.
 
 ## URL downloads
 
@@ -83,3 +83,5 @@ References used for implementation review:
 - [Starlette request parsing](https://starlette.dev/requests/): multipart
   field/file counts; file bytes also need an independent request-body bound.
 - [Docker Desktop Windows prerequisites](https://docs.docker.com/desktop/setup/install/windows-install/).
+
+Hosted validation: 11 smoke checks and a separate public HTTPS image download passed; see `artifacts/deployment-check.json` and `artifacts/hf-public-url-check.json`.

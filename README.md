@@ -6,7 +6,7 @@ Original team repository: https://github.com/Cjmcd23/CSSE_Local_Demo
 
 Existing public deployment: https://huggingface.co/spaces/Legend0908/game-genre-demo
 
-This release has been pushed to the maintained GitHub fork. HF deployment status is recorded in PROJECT_STATUS.md. The model is unchanged; no training notebooks have been recovered or recreated.
+This release is published to the maintained GitHub fork and the existing HF Space. Deployment revision and evidence are recorded in PROJECT_STATUS.md. The model is unchanged; no training notebooks have been recovered or recreated.
 
 ## Run locally
 
@@ -91,4 +91,6 @@ The original Git history is preserved. A separate cleanup commit removes the acc
 
 `upstream` is the original team repository, with pushing disabled locally. `origin` points to the verified personal fork `wenjianzhang15-cyber/Game_Genre_Predictor`. Development is on `chore/local-handoff`. Cloud source changes were reconstructed from recorded patches; the unpublished cloud commits themselves were not transferred.
 
-Do not publish the current branch yet: hosted ingress/cold-start checks and complete UI acceptance checks remain open. Local Docker build, all 74 container tests and production inference have passed. URL restrictions and local resource controls are implemented and tested. The three clickable examples and Top-3 results have been checked in the local browser. Retrieve the model before any Docker build, and review the image contents. Deployment or new remote pushes require the user's approval.
+Published on 2026-10-29 with explicit user authorization. HF revision: `77216ec63ad9a93d782d8bc9af80f5000eced9cc`. All 74 Windows tests, 74 Linux Docker tests, 11 hosted smoke checks and a separate hosted public HTTPS image check passed. The deployed runtime source is GitHub `7451e23`; subsequent commits record release checks and documentation.
+
+Hosting-specific ingress/load testing, idle cold-start measurement and a complete accessibility review remain future work. Local Docker resource flags are not a claim about HF infrastructure limits. Further remote changes still require task authorization.
