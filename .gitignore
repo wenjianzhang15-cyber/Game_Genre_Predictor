@@ -1,3 +1,16 @@
 __pycache__/
 *.pyc
 *.pyo
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+artifacts/
+best_model.pth
+*.part
+.env
+.env.*
+*.log
+*.zip
+*.bundle
