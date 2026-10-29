@@ -66,14 +66,17 @@ real inference, non-root identity and absent Git/test files, then removes only
 its uniquely named test container. Test images remain available locally.
 
 Runtime checks use a read-only filesystem, a 64 MiB `/tmp` tmpfs, 1 GiB memory,
-2 CPUs, 64 PIDs, dropped capabilities and no-new-privileges. These settings
-require measurement in the real Linux image before they are considered verified.
+2 CPUs, 64 PIDs, dropped capabilities and no-new-privileges. These settings passed the local Linux verification and production inference checks; production traffic still needs deployment-specific load testing.
 
 **Current evidence:** 74 Windows tests passed; a real public HTTPS cover
 download returned the expected `platform` prediction. JavaScript syntax,
 Python compilation, dependency consistency and PowerShell script parsing passed.
-Docker/Podman are absent and WSL reports it is not installed. Consequently,
-neither a Linux image build nor container execution has been verified yet.
+After user authorization, WSL 2.7.14.0 and Docker Desktop 4.97.0 were installed.
+The verification and production images built successfully. **All 74 tests passed
+in Linux Python 3.11 (4.69 seconds)** under the stated container resource limits.
+Production health, real model inference, UID 1000 and exclusion of Git/tests
+were verified. Temporary test containers were removed; local images remain.
+The complete output is in `artifacts/docker-verification.log`.
 
 References used for implementation review:
 

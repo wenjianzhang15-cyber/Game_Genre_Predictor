@@ -30,7 +30,7 @@
 ## Remaining before publication
 
 1. URL restrictions and resource budgets are implemented; review hosting-specific ingress/rate limits before publication.
-2. Run `scripts/verify_docker.ps1` after Docker/WSL installation is approved and completed; neither is installed now. Docker build/run and hosted cold start remain unverified.
+2. Local Docker build/run is verified. Hosted ingress settings and hosted cold start remain to be checked before publication.
 3. Complete full keyboard interaction review and confirm final team names and publication wording.
 4. Review the final branch before authorizing a push or HF deployment. No publication authorization has been inferred.
 
@@ -48,5 +48,18 @@
 - **74 tests passed** on Windows, including actual child-process deadline/reaping, private/mixed DNS rejection, redirect rejection, streaming size limits, upload timeout and admission/inference slot behavior. Evidence: `artifacts/security-regression.xml`.
 - Actual public HTTPS download from the fork's raw HollowKnight cover succeeded and predicted platform.
 - Dockerfile now uses explicit files, UID 1000, build-time model verification, healthcheck and test/production targets. Verification script prepared and PowerShell syntax checked, but no actual Docker build/run has occurred.
-- Docker/Podman not found; WSL status explicitly says not installed. Installation question remains pending; no system installation performed.
+- At the hardening checkpoint Docker/WSL were absent. Installation was subsequently authorized and completed; see the container verification update below.
 - No remote pushes or deployment updates.
+
+## Docker verification completed locally
+
+- User explicitly authorized Docker and WSL installation.
+- Installed Microsoft WSL 2.7.14.0 (kernel 6.18.33.2-2) and Docker Desktop 4.97.0 (244584), per-user installation. Engine 29.9.2 reports linux/amd64. No reboot was needed.
+- Fixed PowerShell argument splitting by quoting the comma-separated tmpfs mount options.
+- `scripts/verify_docker.ps1` completed successfully. Linux Python 3.11: **74 passed, 1 upstream deprecation warning in 4.69 seconds**.
+- Production image `game-genre-predictor:local` built successfully; image ID `sha256:18da8ead7fdbddbcda903d338d9babeff72e3e1885a5ee0524d8ae4cca3d7aed`.
+- Verified real inference (Hollow Knight -> platform), HTTP health, UID 1000, and absence of `/app/.git` and `/app/tests`.
+- Test and production containers ran with read-only filesystem, 64 MiB tmpfs, 1 GiB memory, 2 CPUs, 64 PIDs, all capabilities dropped and no-new-privileges. Production test port bound only to 127.0.0.1.
+- Temporary verification containers were removed. Built images and Docker Desktop remain installed locally.
+- Complete build/test output: `artifacts/docker-verification.log`.
+- No remote pushes, HF deployment changes or public ports created.

@@ -13,9 +13,9 @@ $created = $false
 try {
     Invoke-Docker info --format '{{.OSType}}'
     Invoke-Docker build --target verification -t game-genre-predictor:verify .
-    Invoke-Docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --memory 1g --cpus 2 --pids-limit 64 --cap-drop ALL --security-opt no-new-privileges game-genre-predictor:verify
+    Invoke-Docker run --rm --read-only --tmpfs '/tmp:rw,noexec,nosuid,size=64m' --memory 1g --cpus 2 --pids-limit 64 --cap-drop ALL --security-opt no-new-privileges game-genre-predictor:verify
     Invoke-Docker build --target production -t game-genre-predictor:local .
-    Invoke-Docker run -d --name $containerName --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m --memory 1g --cpus 2 --pids-limit 64 --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1::7860 game-genre-predictor:local
+    Invoke-Docker run -d --name $containerName --read-only --tmpfs '/tmp:rw,noexec,nosuid,size=64m' --memory 1g --cpus 2 --pids-limit 64 --cap-drop ALL --security-opt no-new-privileges -p 127.0.0.1::7860 game-genre-predictor:local
     $created = $true
     $binding = (& docker port $containerName 7860/tcp).Trim()
     if ($LASTEXITCODE -ne 0) { throw 'Could not discover local container port.' }

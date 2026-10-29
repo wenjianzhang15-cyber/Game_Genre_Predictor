@@ -10,7 +10,7 @@ This branch is a local reliability handoff. It has not been pushed or deployed. 
 
 ## Run locally
 
-Use Python 3.11 or 3.12. The deployment uses 3.11; the hardened version has passed 74 tests on Windows with Python 3.12.14. The earlier 29-test Linux run predates these security changes; the new Linux container run is still pending.
+Use Python 3.11 or 3.12. The deployment uses 3.11; the hardened version has passed all 74 tests both on Windows with Python 3.12.14 and in the Linux Docker image with Python 3.11.
 
 Windows PowerShell, from the repository root:
 
@@ -91,4 +91,4 @@ The original Git history is preserved. A separate cleanup commit removes the acc
 
 `upstream` is the original team repository, with pushing disabled locally. `origin` points to the verified personal fork `wenjianzhang15-cyber/Game_Genre_Predictor`. Development is on `chore/local-handoff`. Cloud source changes were reconstructed from recorded patches; the unpublished cloud commits themselves were not transferred.
 
-Do not publish the current branch yet: actual Docker verification, hosted ingress/cold-start checks, and complete UI acceptance checks remain open. URL restrictions and local resource controls are implemented and tested. The three clickable examples and Top-3 results have been checked in the local browser. Retrieve the model before any Docker build, and review the image contents. Deployment or new remote pushes require the user's approval.
+Do not publish the current branch yet: hosted ingress/cold-start checks and complete UI acceptance checks remain open. Local Docker build, all 74 container tests and production inference have passed. URL restrictions and local resource controls are implemented and tested. The three clickable examples and Top-3 results have been checked in the local browser. Retrieve the model before any Docker build, and review the image contents. Deployment or new remote pushes require the user's approval.
