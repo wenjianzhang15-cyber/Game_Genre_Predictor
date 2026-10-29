@@ -6,7 +6,7 @@ Original team repository: https://github.com/Cjmcd23/CSSE_Local_Demo
 
 Existing public deployment: https://huggingface.co/spaces/Legend0908/game-genre-demo
 
-This branch is a local reliability handoff. It has not been pushed or deployed. The model is unchanged; no training notebooks have been recovered or recreated.
+This release has been pushed to the maintained GitHub fork. HF deployment status is recorded in PROJECT_STATUS.md. The model is unchanged; no training notebooks have been recovered or recreated.
 
 ## Run locally
 

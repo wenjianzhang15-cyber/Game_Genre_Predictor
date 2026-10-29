@@ -8,7 +8,7 @@
 - Original history retained from `fdc02654782ade7e428a9417f5aeb8badc53f534`.
 - Cloud commits were not transferred as Git objects. Their source changes were reconstructed from recorded patches and the pinned HF snapshot. The restored backend, frontend and requirements hashes matched the prior cloud records before the new UI changes.
 - Removed 31,224 tracked environment files and the stale model pointer in a local cleanup commit. Historical files remain in Git history.
-- No remote pushes or deployment changes performed.
+- GitHub publication authorized and completed: `main` and `chore/local-handoff` contain the verified release. HF upload is awaiting account login; the previous public HF revision is still running.
 
 ## Completed locally
 
@@ -32,7 +32,7 @@
 1. URL restrictions and resource budgets are implemented; review hosting-specific ingress/rate limits before publication.
 2. Local Docker build/run is verified. Hosted ingress settings and hosted cold start remain to be checked before publication.
 3. Complete full keyboard interaction review and confirm final team names and publication wording.
-4. Review the final branch before authorizing a push or HF deployment. No publication authorization has been inferred.
+4. User explicitly authorized GitHub push and HF deployment. GitHub push completed; finish HF login, source upload and post-deployment smoke checks.
 
 ## Links
 
