@@ -1,14 +1,18 @@
 import io, os, time
-from typing import Optional
-import requests
+import json
+import subprocess
+import sys
+import threading
 from PIL import Image
 import torch, torch.nn as nn
 from torchvision import models, transforms
-from fastapi import FastAPI, File, UploadFile, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException
+from starlette.datastructures import UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
-from urllib.parse import urlsplit
+from request_limits import RequestLimits
+from url_download import validate_url, DownloadError, STATUS_EXIT
 from pathlib import Path
 from PIL import UnidentifiedImageError
 
@@ -17,6 +21,13 @@ BASE_DIR = Path(__file__).resolve().parent
 MODEL_PATH   = BASE_DIR / "best_model.pth"
 CLASSES_PATH = BASE_DIR / "classes.txt"
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_IMAGE_PIXELS = 12_000_000
+MAX_IMAGE_SIDE = 8192
+DOWNLOAD_TIMEOUT_SECONDS = 12
+EXAMPLES = {f"/ui/covers/{name}.jpg": BASE_DIR / "covers" / f"{name}.jpg"
+            for name in ("HollowKnight", "Stardew", "moncage")}
+INFERENCE_SLOT = threading.BoundedSemaphore(1)
+torch.set_num_threads(2)
 
 mean=[0.485,0.456,0.406]; std=[0.229,0.224,0.225]
 preprocess = transforms.Compose([
@@ -43,6 +54,7 @@ model.eval()
 softmax = nn.Softmax(dim=1)
 
 app = FastAPI(title="Game Cover Genre Predictor")
+app.add_middleware(RequestLimits)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 from fastapi.staticfiles import StaticFiles
@@ -69,7 +81,7 @@ def root():
 def health():
     return {"ok": True, "classes": N}
 
-def predict_image(img: Image.Image):
+def _predict_image(img: Image.Image):
     t0 = time.time()
     x = preprocess(img).unsqueeze(0)
     with torch.no_grad():
@@ -79,11 +91,25 @@ def predict_image(img: Image.Image):
     return {"label": top[0]["label"], "top_k": top, "model":"resnet50-ft",
             "latency_ms": round((time.time()-t0)*1000)}
 
+def predict_image(img: Image.Image):
+    if not INFERENCE_SLOT.acquire(blocking=False):
+        raise HTTPException(503, "The model is busy. Please try again shortly.", headers={"Retry-After": "2"})
+    try:
+        return _predict_image(img)
+    finally:
+        INFERENCE_SLOT.release()
+
+
 def decode_image(content: bytes) -> Image.Image:
     if len(content) > MAX_IMAGE_BYTES:
         raise HTTPException(413, "Choose an image smaller than 8 MB.")
     try:
         with Image.open(io.BytesIO(content)) as image:
+            if (image.width * image.height > MAX_IMAGE_PIXELS
+                    or max(image.size) > MAX_IMAGE_SIDE):
+                raise HTTPException(413, "Use an image up to 12 megapixels and 8192 pixels per side.")
+            if image.format not in {"JPEG", "PNG", "WEBP"} or getattr(image, "n_frames", 1) != 1:
+                raise HTTPException(415, "Use a single-frame JPEG, PNG or WebP image.")
             image.load()
             return image.convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
@@ -91,60 +117,66 @@ def decode_image(content: bytes) -> Image.Image:
 
 
 def load_image_from_url(url: str) -> Image.Image:
+    if url in EXAMPLES:
+        return decode_image(EXAMPLES[url].read_bytes())
     try:
-        parts = urlsplit(url)
-        valid = parts.scheme in {"https", "http"} and parts.hostname and not parts.username and not parts.password
-    except ValueError:
-        valid = False
-    if not valid:
-        raise HTTPException(400, "Enter a complete http:// or https:// image URL.")
+        validate_url(url)
+    except DownloadError:
+        raise HTTPException(400, "Use a public HTTPS image URL on port 443, without credentials or fragments.") from None
     try:
-        with requests.get(url, timeout=(5, 10), stream=True) as response:
-            if response.status_code != 200:
-                raise HTTPException(400, "The image link could not be opened. Try another link or upload the image.")
-            content = bytearray()
-            for chunk in response.iter_content(65536):
-                content.extend(chunk)
-                if len(content) > MAX_IMAGE_BYTES:
-                    raise HTTPException(413, "Choose an image smaller than 8 MB.")
-            return decode_image(bytes(content))
-    except requests.Timeout:
-        raise HTTPException(504, "The image host took too long to respond. Try uploading the image instead.")
-    except requests.RequestException:
-        raise HTTPException(502, "The image could not be downloaded. Try another link or upload the image.")
+        completed = subprocess.run(
+            [sys.executable, str(BASE_DIR / "url_download.py")],
+            input=json.dumps({"url": url}).encode("utf-8"),
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            timeout=DOWNLOAD_TIMEOUT_SECONDS, check=False,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(504, "The image download exceeded 12 seconds. Try uploading it instead.") from None
+    except OSError:
+        raise HTTPException(502, "The image could not be downloaded. Try uploading it instead.") from None
+    errors = {
+        400: "This URL is blocked or does not directly return an image. Use a public HTTPS image link without redirects.",
+        413: "Choose an image smaller than 8 MB.",
+        415: "The URL must return an uncompressed image response.",
+        502: "The image host could not be reached securely. Try uploading the image.",
+        504: "The image host took too long. Try uploading the image.",
+    }
+    if completed.returncode:
+        code = next((status for status, exit_code in STATUS_EXIT.items()
+                     if exit_code == completed.returncode), 502)
+        raise HTTPException(code, errors[code])
+    return decode_image(completed.stdout)
 
 
 def predict_url(url: str):
-    return predict_image(load_image_from_url(url))
+    with load_image_from_url(url) as image:
+        return predict_image(image)
 
 
 def predict_bytes(content: bytes):
-    return predict_image(decode_image(content))
+    with decode_image(content) as image:
+        return predict_image(image)
 
 @app.post("/predict")
-async def predict(
-    request: Request,
-    file: Optional[UploadFile] = File(None),       # accepts "file"
-    upload: Optional[UploadFile] = File(None)      # also accepts "upload"
-):
-    ctype = request.headers.get("content-type", "")
-    if ctype.startswith("application/json"):
+async def predict(request: Request):
+    ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if ctype == "application/json":
         try:
             data = await request.json()
-        except ValueError:
+        except (ValueError, UnicodeError):
             raise HTTPException(400, "The request contains invalid JSON.")
         url = data.get("url") if isinstance(data, dict) else None
         if not isinstance(url, str) or not url.strip():
             raise HTTPException(400, "JSON must include {'url': ...}")
-        # A synchronous self-URL fetch must not occupy the ASGI event loop.
         return JSONResponse(await run_in_threadpool(predict_url, url.strip()))
-
-    f = file or upload
-    if f is None:
+    if not ctype:
         raise HTTPException(400, "Upload an image file or send JSON {url}")
-
-    try:
+    if ctype != "multipart/form-data":
+        raise HTTPException(415, "Use a multipart image upload or JSON image URL.")
+    async with request.form(max_files=1, max_fields=0, max_part_size=1024) as form:
+        f = form.get("file") or form.get("upload")
+        if not isinstance(f, UploadFile):
+            raise HTTPException(400, "Upload one image using the file field.")
         content = await f.read(MAX_IMAGE_BYTES + 1)
-    finally:
-        await f.close()
     return JSONResponse(await run_in_threadpool(predict_bytes, content))

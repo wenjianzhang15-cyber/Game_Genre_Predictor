@@ -29,8 +29,8 @@
 
 ## Remaining before publication
 
-1. Restrict URL destinations and redirects; bound download duration, decoded image size, request bodies and concurrent predictions.
-2. Test Docker build (Docker is not installed locally) and hosted cold start.
+1. URL restrictions and resource budgets are implemented; review hosting-specific ingress/rate limits before publication.
+2. Run `scripts/verify_docker.ps1` after Docker/WSL installation is approved and completed; neither is installed now. Docker build/run and hosted cold start remain unverified.
 3. Complete full keyboard interaction review and confirm final team names and publication wording.
 4. Review the final branch before authorizing a push or HF deployment. No publication authorization has been inferred.
 
@@ -39,3 +39,14 @@
 - Local preview: http://127.0.0.1:7860/ui/index.html
 - Existing public app: https://legend0908-game-genre-demo.hf.space/ui/index.html
 - HF Space: https://huggingface.co/spaces/Legend0908/game-genre-demo
+
+## Local hardening update
+
+- HTTPS/public-IP-only URL retrieval, DNS pinning with TLS hostname checks, no redirects/proxies/retries, and a 12-second kill/reap deadline.
+- Exact bundled-cover paths preserve examples without loopback requests. External URLs are not fetched again by the browser for preview.
+- Pre-parser body bytes/deadline and admission control; single-file multipart; pixel/dimension/frame restrictions; one concurrent inference and two CPU threads.
+- **74 tests passed** on Windows, including actual child-process deadline/reaping, private/mixed DNS rejection, redirect rejection, streaming size limits, upload timeout and admission/inference slot behavior. Evidence: `artifacts/security-regression.xml`.
+- Actual public HTTPS download from the fork's raw HollowKnight cover succeeded and predicted platform.
+- Dockerfile now uses explicit files, UID 1000, build-time model verification, healthcheck and test/production targets. Verification script prepared and PowerShell syntax checked, but no actual Docker build/run has occurred.
+- Docker/Podman not found; WSL status explicitly says not installed. Installation question remains pending; no system installation performed.
+- No remote pushes or deployment updates.

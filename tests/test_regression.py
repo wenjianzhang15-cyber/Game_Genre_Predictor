@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 import pytest
 import requests
+import subprocess
 from fastapi.testclient import TestClient
 import app
 
@@ -44,7 +45,7 @@ def test_real_upload_and_self_url_match(server, name, label, tmp_path):
     content = (ROOT/'covers'/f'{name}.jpg').read_bytes()
     uploaded = requests.post(server+'/predict', files={'file':(name+'.jpg',content,'image/jpeg')},timeout=15)
     started=time.monotonic()
-    linked = requests.post(server+'/predict', json={'url':server+f'/ui/covers/{name}.jpg'},timeout=15)
+    linked = requests.post(server+'/predict', json={'url':f'/ui/covers/{name}.jpg'},timeout=15)
     assert uploaded.status_code == linked.status_code == 200
     assert time.monotonic()-started < 9
     a,b=uploaded.json(),linked.json()
@@ -82,17 +83,18 @@ def test_upload_alias(client):
     assert r.status_code==200 and r.json()['label']=='platform'
 
 def test_remote_non_image(server):
-    assert requests.post(server+'/predict',json={'url':server+'/ui/index.html'},timeout=15).status_code==415
+    assert requests.post(server+'/predict',json={'url':server+'/ui/index.html'},timeout=15).status_code==400
 
 def test_remote_missing_image(server):
     assert requests.post(server+'/predict',json={'url':server+'/ui/covers/does-not-exist.jpg'},timeout=15).status_code==400
 
-@pytest.mark.parametrize('exception,expected', [(requests.Timeout,504),(requests.ConnectionError,502)])
-def test_download_failures(client,monkeypatch,exception,expected):
-    def fail(*args,**kwargs): raise exception('simulated unavailable upstream')
-    monkeypatch.setattr(app.requests,'get',fail)
+@pytest.mark.parametrize('returncode,expected', [(43,502),(44,504)])
+def test_download_failures(client,monkeypatch,returncode,expected):
+    def fail(*args,**kwargs): return subprocess.CompletedProcess(args, returncode, stdout=b'')
+    monkeypatch.setattr(app.subprocess,'run',fail)
     r=client.post('/predict',json={'url':'https://example.com/cover.jpg'})
     assert r.status_code==expected and 'detail' in r.json()
+
 
 def test_cors_upload_and_preflight(client):
     headers={'Origin':'https://example.com','Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'}

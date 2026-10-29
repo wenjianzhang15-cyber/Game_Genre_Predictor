@@ -10,7 +10,7 @@ This branch is a local reliability handoff. It has not been pushed or deployed. 
 
 ## Run locally
 
-Use Python 3.11 or 3.12. The deployment uses 3.11; this handoff has passed all 29 regression tests on Windows with Python 3.12.14, as well as the previous Linux run.
+Use Python 3.11 or 3.12. The deployment uses 3.11; the hardened version has passed 74 tests on Windows with Python 3.12.14. The earlier 29-test Linux run predates these security changes; the new Linux container run is still pending.
 
 Windows PowerShell, from the repository root:
 
@@ -44,7 +44,7 @@ $env:OPENBLAS_NUM_THREADS = '2'
 
 Linux: `OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 .venv/bin/python -m pytest -q`.
 
-The tests use the real saved model, three existing covers, same-server URL requests, bad input, simulated network failures, CORS, and static-file access restrictions. Test evidence uses temporary directories; it does not depend on the original audit-folder layout.
+The tests use the real saved model, three existing covers, allowlisted bundled-cover requests and URL/resource security cases, bad input, simulated network failures, CORS, and static-file access restrictions. Test evidence uses temporary directories; it does not depend on the original audit-folder layout.
 
 ## Files
 
@@ -59,14 +59,19 @@ The tests use the real saved model, three existing covers, same-server URL reque
 | `tests/` | Real-model and failure-handling regression tests |
 | `requirements.txt` | CPU deployment dependencies |
 | `requirements-dev.txt` | Deployment dependencies plus test tools |
-| `Dockerfile` | Original HF Docker startup configuration |
+| `Dockerfile` | Non-root runtime, verification target and production image |
+| `url_download.py` | Isolated, IP-pinned HTTPS downloader |
+| `request_limits.py` | ASGI admission control and body budgets |
+| `scripts/verify_docker.ps1` | Build, test and smoke-test local Linux containers |
 | `PROJECT_STATUS.md` | Current progress, limitations, and next steps |
 
 ## API
 
 `POST /predict` accepts either a multipart file named `file` (also accepts `upload`) or JSON `{"url":"https://.../cover.jpg"}`. The response contains `label`, `top_k` (all five labels with `prob` scores), `model`, and `latency_ms`. `GET /health` reports application availability and class count; it is not a full inference test.
 
-The application rejects images larger than 8 MiB after request parsing. The reverse proxy/body-transfer limits have not been reviewed. Upload decoding and URL downloads run away from the async event loop, allowing the server to serve its own cover requests. Only `index.html` and `covers/` are exposed under `/ui`.
+URL inputs must be public HTTPS links on port 443 without redirects. DNS answers are validated and connections pinned to public IPs while preserving TLS hostname verification. URL downloads have a 12-second hard subprocess deadline. The three exact bundled example paths (`/ui/covers/HollowKnight.jpg`, `/ui/covers/Stardew.jpg`, `/ui/covers/moncage.jpg`) read local assets directly; arbitrary local URLs are rejected.
+
+Admission control permits two active prediction requests and one inference per process. Before parsing, JSON is capped at 4 KiB and multipart bodies at 8 MiB + 64 KiB, with a 15-second absolute upload deadline. Images must be single-frame JPEG/PNG/WebP, at most 8 MiB, 12 megapixels and 8192 pixels per side. Only `index.html` and `covers/` are exposed under `/ui`. Full limits and Docker verification steps are in [docs/LOCAL_SECURITY.md](docs/LOCAL_SECURITY.md).
 
 ## Model provenance and limitations
 
@@ -86,4 +91,4 @@ The original Git history is preserved. A separate cleanup commit removes the acc
 
 `upstream` is the original team repository, with pushing disabled locally. `origin` points to the verified personal fork `wenjianzhang15-cyber/Game_Genre_Predictor`. Development is on `chore/local-handoff`. Cloud source changes were reconstructed from recorded patches; the unpublished cloud commits themselves were not transferred.
 
-Do not publish the current branch yet: URL destination/redirect restrictions, resource controls, Docker verification, and complete UI acceptance checks remain open. The three clickable examples and Top-3 results have been checked in the local browser. Retrieve the model before any Docker build, and review the image contents. Deployment or new remote pushes require the user's approval.
+Do not publish the current branch yet: actual Docker verification, hosted ingress/cold-start checks, and complete UI acceptance checks remain open. URL restrictions and local resource controls are implemented and tested. The three clickable examples and Top-3 results have been checked in the local browser. Retrieve the model before any Docker build, and review the image contents. Deployment or new remote pushes require the user's approval.

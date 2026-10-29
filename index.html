@@ -160,12 +160,12 @@
             <button class="example" data-cover="moncage.jpg" type="button"><img src="covers/moncage.jpg" alt="" />Moncage</button>
           </div>
           <div style="margin-bottom:16px">
-            <label for="imageUrl">Image URL (optional)</label>
+            <label for="imageUrl">HTTPS image URL (optional)</label>
             <input id="imageUrl" type="text" placeholder="https://.../cover.jpg" />
           </div>
           <div style="margin-bottom:14px">
             <label for="file">Or upload an image</label>
-            <input id="file" type="file" accept="image/*" aria-describedby="uploadHelp" /><p class="meta" id="uploadHelp">JPEG or PNG recommended · up to 8 MB.</p>
+            <input id="file" type="file" accept="image/*" aria-describedby="uploadHelp" /><p class="meta" id="uploadHelp">JPEG, PNG or WebP · up to 8 MB / 12 megapixels.</p>
           </div>
           <div class="row" style="margin-bottom:16px">
             <button id="predictBtn" class="btn">▶ Run Prediction</button>
@@ -281,9 +281,15 @@
       if (f && f.size > 8 * 1024 * 1024) { setStatus('Choose an image smaller than 8 MB.', 'err'); return; }
       if (!f) {
         try {
-          if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error();
-        } catch { setStatus('Enter a complete http:// or https:// image URL.', 'err'); return; }
-        showPreviewFromUrl(url);
+          if (!/^\/ui\/covers\/(HollowKnight|Stardew|moncage)\.jpg$/.test(url) && new URL(url).protocol !== 'https:') throw new Error();
+        } catch { setStatus('Enter a public https:// image URL, or choose an example.', 'err'); return; }
+        if (/^\/ui\/covers\/(HollowKnight|Stardew|moncage)\.jpg$/.test(url)) {
+          showPreviewFromUrl(url);
+        } else {
+          const note = document.createElement('span'); note.className = 'meta';
+          note.textContent = 'URL image is processed securely by the server. Upload a file to see a preview.';
+          preview.replaceChildren(note);
+        }
       }
       resetRequest();
       const version = requestVersion;
@@ -350,7 +356,7 @@
     document.querySelectorAll('[data-cover]').forEach(button => {
       button.addEventListener('click', () => {
         resetRequest(); releasePreview(); file.value = '';
-        imageUrl.value = new URL(`covers/${button.dataset.cover}`, location.href).href;
+        imageUrl.value = `/ui/covers/${button.dataset.cover}`;
         callPredict();
       });
     });

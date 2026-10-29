@@ -7,6 +7,8 @@ torchvision==0.18.0+cpu
 
 pillow
 requests
+urllib3==2.8.0
+certifi==2026.10.23
 python-multipart
 
 
