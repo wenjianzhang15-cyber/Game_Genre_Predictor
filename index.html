@@ -38,7 +38,7 @@
     .btn[disabled]{opacity:.6; cursor:not-allowed}
     .row{display:flex; gap:12px; align-items:center}
     .thumb{width:100%; aspect-ratio: 1 / 1; background:#0a0f24; border:1px solid rgba(255,255,255,.07); border-radius:14px; display:grid; place-items:center; overflow:hidden}
-    .thumb img{width:100%; height:100%; object-fit:cover}
+    .thumb img{width:100%; height:100%; object-fit:contain}
     .meta{font-size:14px; color:var(--muted)}
     .pill{display:inline-block; padding:4px 10px; border-radius:999px; background:#0a1126; border:1px solid rgba(255,255,255,.08); color:var(--muted); font-size:12px; margin-right:6px}
     table{width:100%; border-collapse:collapse; margin-top:8px}
@@ -118,6 +118,22 @@
 
     /* NEW: lifts the card above the covers comfortably */
     .card{ position:relative; z-index:4; }
+
+    .card{width:100%;min-width:0} section{min-width:0}
+    input[type="file"]{max-width:100%}
+    :focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+    input[type="text"]:focus-visible{outline:3px solid var(--accent)}
+    .examples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 20px}
+    .example{padding:8px;border:1px solid #405378;border-radius:12px;background:#0e1530;color:var(--fg);cursor:pointer;font-size:12px}
+    .example:hover{border-color:var(--accent);background:#1c264a}
+    .example img{display:block;width:100%;height:82px;object-fit:cover;border-radius:7px;margin-bottom:7px}
+    .score-track{display:block;width:100%;height:5px;background:#263454;border-radius:4px;margin-top:6px}
+    .score-fill{display:block;height:100%;background:var(--accent);border-radius:4px}
+    #topk tr:first-child{color:var(--ok);font-weight:700}
+    footer a{color:var(--accent)}
+    .code{overflow-wrap:anywhere;white-space:pre-wrap}
+    @media(max-width:480px){.wrap{margin:16px auto;padding:12px}.card{padding:16px}h1{font-size:26px}.row{gap:8px}.btn{font-size:14px;padding:12px 8px}th,td{padding:10px 4px;font-size:13px}}
+    @media(prefers-reduced-motion:reduce){.bg-covers,.focus-point{display:none}.cover-tile{animation:none}}
   </style>
 </head>
 <body>
@@ -133,25 +149,31 @@
   <div class="wrap">
     <div class="card">
       <h1>Video Game Genre Predictor</h1>
-      <p class="sub">Upload a game cover or paste an image URL. The model returns the predicted genre and top-k probabilities.</p>
+      <p class="sub">What does a game cover reveal? Try an example or add your own to explore the model’s top three genre matches.</p>
       <div class="grid">
         <!-- LEFT: Controls -->
         <section>
+          <p class="meta" id="examplesLabel">Try a cover — select to predict</p>
+          <div class="examples" aria-labelledby="examplesLabel">
+            <button class="example" data-cover="HollowKnight.jpg" type="button"><img src="covers/HollowKnight.jpg" alt="" />Hollow Knight</button>
+            <button class="example" data-cover="Stardew.jpg" type="button"><img src="covers/Stardew.jpg" alt="" />Stardew Valley</button>
+            <button class="example" data-cover="moncage.jpg" type="button"><img src="covers/moncage.jpg" alt="" />Moncage</button>
+          </div>
           <div style="margin-bottom:16px">
             <label for="imageUrl">Image URL (optional)</label>
             <input id="imageUrl" type="text" placeholder="https://.../cover.jpg" />
           </div>
           <div style="margin-bottom:14px">
             <label for="file">Or upload an image</label>
-            <input id="file" type="file" accept="image/*" />
+            <input id="file" type="file" accept="image/*" aria-describedby="uploadHelp" /><p class="meta" id="uploadHelp">JPEG or PNG recommended · up to 8 MB.</p>
           </div>
           <div class="row" style="margin-bottom:16px">
             <button id="predictBtn" class="btn">▶ Run Prediction</button>
             <button id="clearBtn" class="btn" style="background:#1c264a; color:#cfe1ff">⟲ Clear</button>
           </div>
-          <div id="status" class="meta">Ready.</div>
+          <div id="status" class="meta" role="status" aria-live="polite">Ready.</div>
           <details style="margin-top:12px">
-            <summary class="meta">Client → API details</summary>
+            <summary class="meta">Developer details</summary>
             <div class="code" id="dbg"></div>
           </details>
         </section>
@@ -160,16 +182,18 @@
           <div class="thumb" id="preview"><span class="meta">No image selected</span></div>
           <div style="margin-top:12px" id="result" class="hidden">
             <div><span class="pill" id="modelName">model: —</span><span class="pill" id="latency">latency: — ms</span></div>
-            <h3 style="margin:12px 0 6px">Top-k predictions</h3>
+            <h2 style="margin:12px 0 6px;font-size:20px">Top 3 genre matches</h2>
+            <p class="meta">Scores compare these five classes; they are not calibrated probabilities of being correct. Unrelated images also receive a prediction.</p>
             <table>
-              <thead><tr><th>Rank</th><th>Genre</th><th>Probability</th></tr></thead>
+              <thead><tr><th>Rank</th><th>Genre</th><th>Model score</th></tr></thead>
               <tbody id="topk"></tbody>
             </table>
           </div>
         </section>
       </div>
       <footer>
-        <div>API endpoint: <span class="code" id="apiBase">(set in code)</span></div>
+        <p>A three-person CSSE/MA416 course project · <a href="https://github.com/Cjmcd23/CSSE_Local_Demo" target="_blank" rel="noopener noreferrer">Original team project</a></p>
+        <p>Five model labels: fighting, indie, platform, puzzle and sport. This demo does not save uploads permanently; temporary processing files may be used.</p>
       </footer>
     </div>
   </div>
@@ -193,11 +217,9 @@
     const topk = el('topk');
     const status = el('status');
     const dbg = el('dbg');
-    const apiBase = el('apiBase');
     const modelName = el('modelName');
     const latency = el('latency');
 
-    apiBase.textContent = API_BASE + ENDPOINT_PREDICT;
 
     function setStatus(msg, kind="info"){
       status.textContent = msg;
@@ -205,18 +227,44 @@
     }
 
     function showPreviewFromUrl(url){
-      preview.innerHTML = `<img src="${url}" alt="preview"/>`;
+      const img = document.createElement("img");
+      img.src = url; img.alt = "Selected game cover";
+      preview.replaceChildren(img);
     }
 
+    let activeRequest = null;
+    let requestVersion = 0;
+    let previewObjectUrl = null;
+    function releasePreview() {
+      if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = null;
+    }
+    function resetRequest() {
+      requestVersion++;
+      activeRequest?.abort();
+      activeRequest = null;
+      predictBtn.disabled = false;
+      result.classList.add('hidden');
+      dbg.textContent = '';
+    }
+    imageUrl.addEventListener('input', () => {
+      resetRequest(); releasePreview(); file.value = '';
+      preview.replaceChildren();
+      setStatus('Ready.');
+    });
+
     file.addEventListener('change', () => {
+      resetRequest(); releasePreview(); imageUrl.value = '';
+      setStatus('Ready.');
       const f = file.files?.[0];
       if(!f){ preview.innerHTML = '<span class="meta">No image selected</span>'; return; }
-      const reader = new FileReader();
-      reader.onload = (e) => { preview.innerHTML = `<img src="${e.target.result}" alt="preview"/>`; };
-      reader.readAsDataURL(f);
+      if (f.size > 8 * 1024 * 1024) { preview.replaceChildren(); setStatus('Choose an image smaller than 8 MB.', 'err'); return; }
+      previewObjectUrl = URL.createObjectURL(f);
+      showPreviewFromUrl(previewObjectUrl);
     });
 
     clearBtn.addEventListener('click', () => {
+      resetRequest(); releasePreview();
       imageUrl.value = '';
       file.value = '';
       preview.innerHTML = '<span class="meta">No image selected</span>';
@@ -229,66 +277,83 @@
     async function callPredict() {
       const url = imageUrl.value.trim();
       const f = file.files?.[0] || null;
-      if(!url && !f){ setStatus('Provide an image URL or upload a file.', 'err'); return; }
-
-      setStatus('Sending to model…');
+      if (!url && !f) { setStatus('Provide an image URL or upload a file.', 'err'); return; }
+      if (f && f.size > 8 * 1024 * 1024) { setStatus('Choose an image smaller than 8 MB.', 'err'); return; }
+      if (!f) {
+        try {
+          if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error();
+        } catch { setStatus('Enter a complete http:// or https:// image URL.', 'err'); return; }
+        showPreviewFromUrl(url);
+      }
+      resetRequest();
+      const version = requestVersion;
+      const controller = new AbortController();
+      activeRequest = controller;
+      const timeout = setTimeout(() => controller.abort(), 25000);
       predictBtn.disabled = true;
-
-      const t0 = performance.now();
-      let resp, payloadDesc;
+      setStatus('Sending to model…');
+      let payloadDesc = f ? 'multipart/form-data (file)' : 'application/json {url}';
       try {
-        if(f){
-          const form = new FormData();
-          form.append('file', f);
-          resp = await fetch(API_BASE + ENDPOINT_PREDICT, { method:'POST', body: form });
-          payloadDesc = 'multipart/form-data (file)';
+        let options = {method: 'POST', signal: controller.signal};
+        if (f) {
+          const form = new FormData(); form.append('file', f); options.body = form;
         } else {
-          resp = await fetch(API_BASE + ENDPOINT_PREDICT, { 
-            method:'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
-          });
-          payloadDesc = 'application/json {url}';
-          showPreviewFromUrl(url);
+          options.headers = {'Content-Type': 'application/json'};
+          options.body = JSON.stringify({url});
         }
-      } catch (e) {
-        setStatus('Network error. Open console for details.', 'err');
-        console.error(e);
-        predictBtn.disabled = false;
-        return;
+        const resp = await fetch(API_BASE + ENDPOINT_PREDICT, options);
+        const data = await resp.json().catch(() => null);
+        if (version !== requestVersion) return;
+        dbg.textContent = `POST ${API_BASE + ENDPOINT_PREDICT}\nPayload: ${payloadDesc}\nStatus: ${resp.status}`;
+        if (!resp.ok) {
+          const detail = typeof data?.detail === 'string' ? data.detail : null;
+          throw new Error(detail || 'The prediction service could not complete this request. Please try again shortly.');
+        }
+        if (!Array.isArray(data?.top_k) || !data.top_k.length || data.top_k.some(r =>
+          typeof r.label !== 'string' || !Number.isFinite(r.prob) || r.prob < 0 || r.prob > 1)) {
+          throw new Error('The service returned an unexpected response. Please try again.');
+        }
+        topk.replaceChildren();
+        data.top_k.slice(0, 3).forEach((r, i) => {
+          const tr = document.createElement('tr');
+          [`#${i+1}`, r.label, `${(r.prob*100).toFixed(2)}%`].forEach(value => {
+            const td = document.createElement('td'); td.textContent = value; tr.appendChild(td);
+          });
+          const track = document.createElement('span'); track.className = 'score-track'; track.setAttribute('aria-hidden', 'true');
+          const fill = document.createElement('span'); fill.className = 'score-fill'; fill.style.width = `${r.prob * 100}%`;
+          track.appendChild(fill); tr.lastElementChild.appendChild(track);
+          topk.appendChild(tr);
+        });
+        modelName.textContent = `model: ${data.model ?? '—'}`;
+        latency.textContent = `latency: ${data.latency_ms ?? '—'} ms`;
+        result.classList.remove('hidden');
+        setStatus(`Done. Prediction: ${data.label ?? data.top_k[0].label}`, 'ok');
+      } catch (error) {
+        if (version !== requestVersion) return;
+        const message = error.name === 'AbortError'
+          ? 'The request took too long. The service may be waking up. Please try again.'
+          : error instanceof TypeError
+            ? 'Cannot reach the prediction service. Check your connection and try again.'
+            : error.message;
+        setStatus(message, 'err');
+        if (!dbg.textContent) dbg.textContent = `POST ${API_BASE + ENDPOINT_PREDICT}\n${error.name}: ${error.message}`;
+      } finally {
+        clearTimeout(timeout);
+        if (version === requestVersion) { predictBtn.disabled = false; activeRequest = null; }
       }
-
-      const t1 = performance.now();
-      let data;
-      try { data = await resp.json(); } catch { data = null; }
-
-      dbg.textContent = `POST ${API_BASE+ENDPOINT_PREDICT}\nPayload: ${payloadDesc}\nStatus: ${resp.status}`;
-
-      if(!resp.ok || !data){
-        setStatus(`API error (${resp.status}).`, 'err');
-        result.classList.add('hidden');
-        predictBtn.disabled = false;
-        return;
-      }
-
-      // Expected JSON shape (example):
-      // { label: "action", top_k:[{"label":"action","prob":0.72},...], model:"resnet50-ft", latency_ms:123 }
-      const tk = (data.top_k || []).slice(0, 5);
-      topk.innerHTML = tk.map((r, i) => `
-        <tr>
-          <td>#${i+1}</td>
-          <td>${r.label ?? '-'}</td>
-          <td>${typeof r.prob === 'number' ? (r.prob*100).toFixed(2)+'%' : '-'}</td>
-        </tr>`).join('');
-
-      modelName.textContent = `model: ${data.model ?? '—'}`;
-      latency.textContent = `latency: ${Math.round(data.latency_ms ?? (t1 - t0))} ms`;
-      result.classList.remove('hidden');
-      setStatus(`Done. Prediction: ${data.label ?? tk[0]?.label ?? '—'}`, 'ok');
-      predictBtn.disabled = false;
     }
 
     predictBtn.addEventListener('click', callPredict);
+    imageUrl.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && !predictBtn.disabled) callPredict();
+    });
+    document.querySelectorAll('[data-cover]').forEach(button => {
+      button.addEventListener('click', () => {
+        resetRequest(); releasePreview(); file.value = '';
+        imageUrl.value = new URL(`covers/${button.dataset.cover}`, location.href).href;
+        callPredict();
+      });
+    });
 
     /* ========= NEW: Moving covers background logic ========= */
     const coversLayer = document.getElementById('coversLayer');
@@ -383,9 +448,11 @@ const COVER_URLS = [
       targetRY = dx * 8;   // yaw
       targetRX = -dy * 6;  // pitch
     }
-    window.addEventListener('mousemove', onMouseMove);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    window.addEventListener('mousemove', e => { if (!reducedMotion.matches) onMouseMove(e); });
 
     function animateParallax(){
+      if (reducedMotion.matches) return;
       curRX += (targetRX - curRX) * 0.08;
       curRY += (targetRY - curRY) * 0.08;
       coversLayer.style.transform = `rotateX(${curRX}deg) rotateY(${curRY}deg) translateZ(0)`;
@@ -399,6 +466,7 @@ const COVER_URLS = [
 
     spawnTiles();
     animateParallax();
+    reducedMotion.addEventListener('change', e => { if (!e.matches) animateParallax(); });
     /* ======== end moving covers background ======== */
   </script>
 </body>
